@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "323080892222",
+    "project_id": "gr1-returnly-2025-intersession",
+    "storage_bucket": "gr1-returnly-2025-intersession.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:323080892222:android:743c137715d6b71206c66f",
+        "android_client_info": {
+          "package_name": "com.example.returnly_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpb3gMm1VHcws0w42wO4vr4I7xqulxELI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
