@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "816305286247",
+    "project_id": "returnly-13bfe",
+    "storage_bucket": "returnly-13bfe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:816305286247:android:210c57a21fc467d0f538c2",
+        "android_client_info": {
+          "package_name": "com.example.returnly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEVXxY-RmcYnAtamGsg3sR_mT7NoGIsKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
