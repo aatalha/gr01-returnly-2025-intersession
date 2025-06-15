@@ -175,6 +175,7 @@ class _HomeTabState extends State<HomeTab> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
+
                                   timeAgo,
                                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
@@ -220,6 +221,7 @@ class _HomeTabState extends State<HomeTab> {
                     String timeAgo = '';
                     if (timestamp != null) {
                       timeAgo = formatTimeDifference(timestamp);
+
                     }
 
                     return InkWell(
@@ -342,7 +344,7 @@ class _HomeTabState extends State<HomeTab> {
                                     
                                     const SizedBox(height: 6),
                                     
-                                    // User and Time Ago
+
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -406,5 +408,7 @@ class FavoritesTab extends StatelessWidget {
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
   @override
+
   Widget build(BuildContext context) => const ProfileScreen();
 }
+

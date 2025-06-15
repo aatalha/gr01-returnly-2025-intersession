@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-
 class Comments extends StatelessWidget {
   final String text;
   final String user;
