@@ -3,8 +3,34 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:returnly_app/screens/home/post_detail_page.dart';
+import 'package:returnly_app/screens/profile/profile_screen.dart';
 import '../../services/auth_service.dart';
 import '../items/search_screen.dart';
+
+// Add this helper function to format the time difference
+String formatTimeDifference(DateTime postTime) {
+  final now = DateTime.now();
+  final difference = now.difference(postTime);
+  
+  if (difference.inSeconds < 60) {
+    return 'Just now';
+  } else if (difference.inMinutes < 60) {
+    return '${difference.inMinutes} min ago';
+  } else if (difference.inHours < 24) {
+    return '${difference.inHours} hr ago';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+  } else if (difference.inDays < 30) {
+    final weeks = (difference.inDays / 7).floor();
+    return '$weeks week${weeks > 1 ? 's' : ''} ago';
+  } else if (difference.inDays < 365) {
+    final months = (difference.inDays / 30).floor();
+    return '$months month${months > 1 ? 's' : ''} ago';
+  } else {
+    final years = (difference.inDays / 365).floor();
+    return '$years year${years > 1 ? 's' : ''} ago';
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -95,6 +121,12 @@ class _HomeTabState extends State<HomeTab> {
                       final userName  = post['userName'] as String? ?? '';
                       final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
                       final desc      = post['description'] as String? ?? '';
+                      
+                      // Calculate time difference
+                      String timeAgo = '';
+                      if (timestamp != null) {
+                        timeAgo = formatTimeDifference(timestamp);
+                      }
 
                       return InkWell(
                         onTap: () => showModalBottomSheet(
@@ -136,14 +168,15 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                child: Text((post['userName'] as String?)?.isNotEmpty == true
+                                  ? post['userName']
+                                  : 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
-                                  timestamp != null
-                                      ? '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')}'
-                                      : '',
+                                  timeAgo,
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
                               ),
                             ],
@@ -182,12 +215,11 @@ class _HomeTabState extends State<HomeTab> {
                     final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
                     final title = post['title'] as String? ?? '';
                     final isLost = post['isLost'] ?? true;
-
-                    // Format date
-                    String formattedDate = '';
+                    
+                    // Calculate time difference
+                    String timeAgo = '';
                     if (timestamp != null) {
-                      formattedDate = 
-                        '${timestamp.month}/${timestamp.day}/${timestamp.year}';
+                      timeAgo = formatTimeDifference(timestamp);
                     }
 
                     return InkWell(
@@ -310,16 +342,18 @@ class _HomeTabState extends State<HomeTab> {
                                     
                                     const SizedBox(height: 6),
                                     
-                                    // User and Date
+                                    // User and Time Ago
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          userName,
+                                          (post['userName'] as String?)?.isNotEmpty == true
+                                            ? post['userName']
+                                            : 'Anonymous',
                                           style: const TextStyle(fontSize: 13),
                                         ),
                                         Text(
-                                          formattedDate,
+                                          timeAgo,
                                           style: const TextStyle(fontSize: 13, color: Colors.grey),
                                         ),
                                       ],
@@ -372,11 +406,5 @@ class FavoritesTab extends StatelessWidget {
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
   @override
-  Widget build(BuildContext context) {
-    final user = context.watch<AuthService>().currentUser;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: Center(child: Text('Welcome, ${user?.displayName ?? 'User'}!')),
-    );
-  }
+  Widget build(BuildContext context) => const ProfileScreen();
 }
