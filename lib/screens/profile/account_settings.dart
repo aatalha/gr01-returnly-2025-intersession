@@ -40,6 +40,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         // letting theme control background, icons, text style
       ),
       // scaffoldBackgroundColor comes from theme
