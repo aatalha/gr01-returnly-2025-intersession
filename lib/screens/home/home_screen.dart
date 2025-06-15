@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:returnly_app/screens/home/post_detail_page.dart';
 import 'package:returnly_app/screens/profile/profile_screen.dart';
 import 'package:returnly_app/screens/chat/chat_list_screen.dart';
@@ -35,7 +35,8 @@ String formatTimeDifference(DateTime postTime) {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final User? user;
+  const HomeScreen({super.key, this.user});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();

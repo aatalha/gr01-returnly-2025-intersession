@@ -39,24 +39,24 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     title: const Text('Account Settings'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => context.go('/settings'),
+                    onTap: () => context.go('/home/settings'),
                   ),
                   
                   ListTile(
                     title: const Text('About Us'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => context.go('/about'),
+                    onTap: () => context.go('/home/about'),
                   ),
 
                   ListTile(
                     title: const Text('Privacy Policy'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => context.go('/privacy-policy'),
+                    onTap: () => context.go('/home/privacy-policy'),
                   ),
                   ListTile(
                     title: const Text('Terms & Conditions'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => context.go('/terms-conditions'),
+                    onTap: () => context.go('/home/terms-conditions'),
                   ),
 
                   const SizedBox(height: 32),
