@@ -57,13 +57,10 @@ class _AddPostPageState extends State<AddPostPage> {
   setState(() { _loading = true; _progress = 0.0; });
 
   try {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = (user?.displayName?.isNotEmpty == true)
-    ? user!.displayName
-    : (user?.email?.split('@').first ?? 'Anonymous');
+    final user = context.read<AuthService>().currentUser!;
     final file = File(_image!.path);
     final ref = FirebaseStorage.instance
-        .ref('posts/${user?.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        .ref('posts/${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
     // 1. Add metadata with content type
     final uploadTask = ref.putFile(
       file,
@@ -82,8 +79,8 @@ class _AddPostPageState extends State<AddPostPage> {
       'category':    _selectedCategory,
       'location':    _selectedLocation,
       'isLost':      _isLost ?? true, 
-      'userId':      user?.uid,
-      'userName':    userName,
+      'userId':      user.uid,
+      'userName':    user.displayName ?? user.email!.split('@')[0],
       'timestamp':   FieldValue.serverTimestamp(),
       'description': _descCtrl.text.trim(),
     });
