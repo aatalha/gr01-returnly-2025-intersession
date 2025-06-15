@@ -56,7 +56,7 @@ final ThemeData lightMode = ThemeData.light().copyWith(
   ),
 
   // Card styling (same as background or change if you like)
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: const Color(0xFFFEFAF6),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     elevation: 0,
@@ -117,7 +117,7 @@ final ThemeData darkMode = ThemeData.dark().copyWith(
     ),
   ),
 
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: Colors.grey[850],
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     elevation: 2,
