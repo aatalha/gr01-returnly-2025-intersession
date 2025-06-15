@@ -4,14 +4,16 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:returnly_app/screens/home/post_detail_page.dart';
 import 'package:returnly_app/screens/profile/profile_screen.dart';
+import 'package:returnly_app/screens/chat/chat_list_screen.dart';
 import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
 import '../items/search_screen.dart';
 
 // Add this helper function to format the time difference
 String formatTimeDifference(DateTime postTime) {
   final now = DateTime.now();
   final difference = now.difference(postTime);
-  
+
   if (difference.inSeconds < 60) {
     return 'Just now';
   } else if (difference.inMinutes < 60) {
@@ -41,11 +43,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  final ChatService _chatService = ChatService();
 
   final List<Widget> _screens = const [
     HomeTab(),
     SearchTab(),
-    FavoritesTab(),
+    ChatTab(),
     ProfileTab(),
   ];
 
@@ -57,11 +60,58 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (idx) => setState(() => _currentIndex = idx),
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: StreamBuilder<int>(
+              stream: _chatService.getUnreadMessagesCountStream(),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+                return Stack(
+                  children: [
+                    const Icon(Icons.favorite), // Using favorite as chat icon temporarily
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            label: 'Chat',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
@@ -81,12 +131,8 @@ class _HomeTabState extends State<HomeTab> {
     // Listen to the posts collection, most recent first
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () => context.go('/notifications'),
-          )
-        ],
+        title: const Text('Returnly'),
+        // TODO: Developer B will add notifications button here
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -121,7 +167,7 @@ class _HomeTabState extends State<HomeTab> {
                       final userName  = post['userName'] as String? ?? '';
                       final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
                       final desc      = post['description'] as String? ?? '';
-                      
+
                       // Calculate time difference
                       String timeAgo = '';
                       if (timestamp != null) {
@@ -169,13 +215,12 @@ class _HomeTabState extends State<HomeTab> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text((post['userName'] as String?)?.isNotEmpty == true
-                                  ? post['userName']
-                                  : 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    ? post['userName']
+                                    : 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
-
                                   timeAgo,
                                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
@@ -216,12 +261,11 @@ class _HomeTabState extends State<HomeTab> {
                     final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
                     final title = post['title'] as String? ?? '';
                     final isLost = post['isLost'] ?? true;
-                    
+
                     // Calculate time difference
                     String timeAgo = '';
                     if (timestamp != null) {
                       timeAgo = formatTimeDifference(timestamp);
-
                     }
 
                     return InkWell(
@@ -263,7 +307,7 @@ class _HomeTabState extends State<HomeTab> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-                            
+
                             // Post Details
                             Expanded(
                               child: Padding(
@@ -302,7 +346,7 @@ class _HomeTabState extends State<HomeTab> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                        
+
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 4),
@@ -325,9 +369,9 @@ class _HomeTabState extends State<HomeTab> {
                                         ),
                                       ],
                                     ),
-                                    
+
                                     const SizedBox(height: 6),
-                                    
+
                                     // Location
                                     Row(
                                       children: [
@@ -341,17 +385,16 @@ class _HomeTabState extends State<HomeTab> {
                                         ),
                                       ],
                                     ),
-                                    
+
                                     const SizedBox(height: 6),
-                                    
 
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           (post['userName'] as String?)?.isNotEmpty == true
-                                            ? post['userName']
-                                            : 'Anonymous',
+                                              ? post['userName']
+                                              : 'Anonymous',
                                           style: const TextStyle(fontSize: 13),
                                         ),
                                         Text(
@@ -384,7 +427,6 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-
 /// The Search tab (assign your own screen)
 class SearchTab extends StatelessWidget {
   const SearchTab({super.key});
@@ -392,23 +434,16 @@ class SearchTab extends StatelessWidget {
   Widget build(BuildContext context) => const SearchScreen();
 }
 
-/// The Favorites tab placeholder
-class FavoritesTab extends StatelessWidget {
-  const FavoritesTab({super.key});
+/// The Chat tab - new implementation
+class ChatTab extends StatelessWidget {
+  const ChatTab({super.key});
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Favorites')),
-      body: const Center(child: Text('Coming soon')),
-    );
-  }
+  Widget build(BuildContext context) => const ChatListScreen();
 }
 
 /// The Profile tab (simple welcome)
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
   @override
-
   Widget build(BuildContext context) => const ProfileScreen();
 }
-

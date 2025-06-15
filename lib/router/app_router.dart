@@ -5,6 +5,11 @@ import 'package:returnly_app/screens/profile/about_us_screen.dart';
 import 'package:returnly_app/screens/profile/account_settings.dart';
 import 'package:returnly_app/screens/profile/privacy_policy_screen.dart';
 import 'package:returnly_app/screens/profile/terms_conditions_screen.dart';
+// ✅ ADD THESE CHAT IMPORTS
+import 'package:returnly_app/screens/chat/chat_list_screen.dart';
+import 'package:returnly_app/screens/chat/chat_detail_screen.dart';
+// ❌ NO NOTIFICATION IMPORTS YET
+
 import '../screens/auth/login_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -67,6 +72,26 @@ class AppRouter {
             path: 'terms-conditions',
             builder: (context, state) => const TermsConditionsScreen(),
           ),
+          // ✅ ADD CHAT ROUTES HERE
+          GoRoute(
+            path: 'chat',
+            builder: (context, state) => const ChatListScreen(),
+          ),
+          GoRoute(
+            path: 'chat/:chatId',
+            builder: (context, state) {
+              final chatId = state.pathParameters['chatId']!;
+              final otherUserName = state.uri.queryParameters['otherUserName'] ?? 'Unknown';
+              final itemTitle = state.uri.queryParameters['itemTitle'] ?? 'Unknown Item';
+
+              return ChatDetailScreen(
+                chatId: chatId,
+                otherUserName: otherUserName,
+                itemTitle: itemTitle,
+              );
+            },
+          ),
+          // 📝 DEVELOPER B WILL ADD NOTIFICATION ROUTES HERE LATER
         ],
       ),
       GoRoute(
@@ -83,6 +108,26 @@ class AppRouter {
           ),
         ],
       ),
+      // ✅ ADD DIRECT CHAT ROUTES (for external navigation)
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatListScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:chatId',
+        builder: (context, state) {
+          final chatId = state.pathParameters['chatId']!;
+          final otherUserName = state.uri.queryParameters['otherUserName'] ?? 'Unknown';
+          final itemTitle = state.uri.queryParameters['itemTitle'] ?? 'Unknown Item';
+
+          return ChatDetailScreen(
+            chatId: chatId,
+            otherUserName: otherUserName,
+            itemTitle: itemTitle,
+          );
+        },
+      ),
+      // 📝 DEVELOPER B WILL ADD DIRECT NOTIFICATION ROUTES HERE LATER
     ],
   );
 }
