@@ -169,7 +169,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   'No conversations yet',
                   style: TextStyle(fontSize: 18, color: Colors.grey),
                 ),
-                SizedBox(height: 😎,
+                SizedBox(height: 8),
                 Text(
                   'Start a conversation by messaging\nsomeone about their item',
                   textAlign: TextAlign.center,
@@ -332,6 +332,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   chatId: chat.id,
                   otherUserName: otherUserName,
                   itemTitle: chat.itemTitle,
+                  itemImageUrl: chat.itemImageUrl,
                 ),
               ),
             );
