@@ -130,7 +130,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-
             CircleAvatar(
               radius: 20,
               backgroundImage: widget.itemImageUrl?.isNotEmpty == true
@@ -210,7 +209,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           'No messages yet',
                           style: TextStyle(fontSize: 18, color: Colors.grey),
                         ),
-                        SizedBox(height: 😎,
+                        SizedBox(height: 8),
                         Text(
                           'Start the conversation!',
                           style: TextStyle(color: Colors.grey),
@@ -241,7 +240,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       children: [
                         if (showTimestamp)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 😎,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               _formatMessageTime(message.timestamp),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -296,7 +295,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(width: 😎,
+                  const SizedBox(width: 8),
 
                   // Send button
                   Container(
@@ -373,7 +372,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             // Message content
             if (message.type == MessageType.image && message.imageUrl != null)
               ClipRRect(
-                borderRadius: BorderRadius.circular(😎,
+                borderRadius: BorderRadius.circular(8),
                 child: Image.network(
                   message.imageUrl!,
                   loadingBuilder: (context, child, loadingProgress) {
