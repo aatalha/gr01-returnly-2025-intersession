@@ -1,60 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:returnly_app/screens/home/post_detail_page.dart';
 import '../../services/auth_service.dart';
 import '../items/search_screen.dart';
 
-// -------------------- Post Model & Placeholder Firebase Logic -------------------------
-class Post {
-  final String imageUrl;
-  final String title;
-  final String author;
-  final int comments;
-  final String timestamp;
-
-  Post({
-    required this.imageUrl,
-    required this.title,
-    required this.author,
-    required this.comments,
-    required this.timestamp,
-  });
-}
-
-Future<String> fetchUserProfileImageUrl() async {
-  return 'https://picsum.photos/seed/626/600';
-}
-
-Future<List<Post>> fetchHighlightedPosts() async {
-  return List.generate(
-    3,
-    (i) => Post(
-      imageUrl: 'https://picsum.photos/seed/${i + 1}/600',
-      title: 'Sample Title ${i + 1}',
-      author: 'Author ${i + 1}',
-      comments: (i + 1) * 5,
-      timestamp: '${(i + 1) * 2}h',
-    ),
-  );
-}
-
-Future<List<Post>> fetchPopularPosts() async {
-  return List.generate(
-    3,
-    (i) => Post(
-      imageUrl: 'https://picsum.photos/seed/${i + 4}/600',
-      title: 'Popular Title ${i + 1}',
-      author: 'Author ${i + 1}',
-      comments: (i + 1) * 3,
-      timestamp: '${(i + 1) * 3}h',
-    ),
-  );
-}
-
-// -------------------- HomeScreen Navigation -------------------------
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -65,11 +16,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeTab(),
-    const SearchTab(),
-    const FavoritesTab(),
-    const ProfileTab(),
+  final List<Widget> _screens = const [
+    HomeTab(),
+    SearchTab(),
+    FavoritesTab(),
+    ProfileTab(),
   ];
 
   @override
@@ -78,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (idx) => setState(() => _currentIndex = idx),
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -91,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// -------------------- HomeTab With Posts Layout -------------------------
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -100,210 +50,333 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  late TextEditingController _searchController;
-  String _profileImageUrl = '';
-  List<Post> _highlightedPosts = [];
-  List<Post> _popularPosts = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController = TextEditingController();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    _profileImageUrl = await fetchUserProfileImageUrl();
-    _highlightedPosts = await fetchHighlightedPosts();
-    _popularPosts = await fetchPopularPosts();
-    setState(() {
-      _loading = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthService>().currentUser;
-
+    // Listen to the posts collection, most recent first
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          'Hey ${user?.displayName ?? 'User'}',
-          style: GoogleFonts.outfit(
-            color: const Color(0xFF15161E),
-            fontWeight: FontWeight.w500,
-            fontSize: 24,
-          ),
-        ),
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundImage: NetworkImage(
-              _profileImageUrl.isNotEmpty
-                  ? _profileImageUrl
-                  : 'https://via.placeholder.com/150',
-            ),
-            radius: 22,
-          ),
-        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Color(0xFF15161E)),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Color(0xFF15161E)),
-            onPressed: () {},
-          ),
+            icon: const Icon(Icons.notifications),
+            onPressed: () => context.go('/notifications'),
+          )
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Search bar
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('posts')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (ctx, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final docs = snap.data?.docs ?? [];
+          if (docs.isEmpty) return const Center(child: Text('No posts yet.'));
+          final highlightedDocs = docs.take(5).toList();
+          final feedDocs = docs.skip(5).toList();
+
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Highlighted posts (horizontal)
+                SizedBox(
+                  height: 250,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: highlightedDocs.length,
+                    itemBuilder: (ctx, i) {
+                      final doc = highlightedDocs[i];
+                      final post = doc.data()! as Map<String, dynamic>;
+                      final imageUrl  = post['imageUrl'] as String? ?? '';
+                      final location  = post['location'] as String? ?? '';
+                      final userName  = post['userName'] as String? ?? '';
+                      final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
+                      final desc      = post['description'] as String? ?? '';
+
+                      return InkWell(
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                          builder: (_) => FractionallySizedBox(
+                            heightFactor: 0.9, // 90% of screen height
+                            child: PostDetailSheet(post: post, postId: doc.id),
+                          ),
+                        ),
+                        child: Container(
+                          width: 220,
+                          margin: const EdgeInsets.only(right: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                child: Image.network(
+                                  imageUrl,
+                                  height: 120,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(location),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  timestamp != null
+                                      ? '${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')}'
+                                      : '',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                // Vertical feed header
+                const Padding(
+                  padding: EdgeInsets.only(left: 24, top: 24, bottom: 12),
+                  child: Text(
+                    'Most Recent Posts',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                ),
+
+                // Vertical feed of the rest - IMPROVED
+                ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: feedDocs.length,
+                  itemBuilder: (ctx, i) {
+                    final doc = feedDocs[i];
+                    final post = doc.data()! as Map<String, dynamic>;
+                    final imageUrl = post['imageUrl'] as String? ?? '';
+                    final location = post['location'] as String? ?? '';
+                    final userName = post['userName'] as String? ?? '';
+                    final timestamp = (post['timestamp'] as Timestamp?)?.toDate();
+                    final title = post['title'] as String? ?? '';
+                    final isLost = post['isLost'] ?? true;
+
+                    // Format date
+                    String formattedDate = '';
+                    if (timestamp != null) {
+                      formattedDate = 
+                        '${timestamp.month}/${timestamp.day}/${timestamp.year}';
+                    }
+
+                    return InkWell(
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                        builder: (_) => FractionallySizedBox(
+                          heightFactor: 0.9,
+                          child: PostDetailSheet(post: post, postId: doc.id),
                         ),
                       ),
-                    ),
-                  ),
-                  // Filter chips
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Wrap(
-                      spacing: 8,
-                      children: ['For You', 'Tech', 'AI', 'News']
-                          .map((label) => ChoiceChip(
-                                label: Text(label),
-                                selected: false,
-                                onSelected: (_) {},
-                              ))
-                          .toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Highlighted posts
-                  SizedBox(
-                    height: 260,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _highlightedPosts.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemBuilder: (context, i) =>
-                          _buildHighlightedPostCard(_highlightedPosts[i]),
-                    ),
-                  ),
-                  const Divider(),
-                  // Popular posts
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Popular Today',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _popularPosts.length,
-                    itemBuilder: (context, i) =>
-                        _buildPopularPostCard(_popularPosts[i]),
-                  ),
-                ],
-              ),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Post Image
+                            ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                bottomLeft: Radius.circular(12),
+                              ),
+                              child: Image.network(
+                                imageUrl,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            
+                            // Post Details
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Title and Status
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            title,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        //container for category label
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade100,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            post['category'] ?? 'Other',
+                                            style: TextStyle(
+                                              color: Colors.blue.shade800,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                        
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: isLost
+                                                ? Colors.red.shade100
+                                                : Colors.green.shade100,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            isLost ? 'LOST' : 'FOUND',
+                                            style: TextStyle(
+                                              color: isLost
+                                                  ? Colors.red.shade800
+                                                  : Colors.green.shade800,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    const SizedBox(height: 6),
+                                    
+                                    // Location
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          location,
+                                          style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    const SizedBox(height: 6),
+                                    
+                                    // User and Date
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          userName,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        Text(
+                                          formattedDate,
+                                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-    );
-  }
-
-  Widget _buildHighlightedPostCard(Post post) {
-    return Container(
-      width: 220,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black12)],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue[100]!),
+          );
+        },
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Image.network(post.imageUrl,
-                width: double.infinity, height: 120, fit: BoxFit.cover),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Text(post.title,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/add_post'),
+        tooltip: 'Add a Post',
+        child: const Icon(Icons.add),
       ),
-    );
-  }
-
-  Widget _buildPopularPostCard(Post post) {
-    return ListTile(
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(post.imageUrl, width: 60, height: 60, fit: BoxFit.cover),
-      ),
-      title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(post.author),
-      trailing: Text(post.timestamp),
     );
   }
 }
 
-// -------------------- Other Tabs -------------------------
+
+/// The Search tab (assign your own screen)
 class SearchTab extends StatelessWidget {
   const SearchTab({super.key});
   @override
   Widget build(BuildContext context) => const SearchScreen();
 }
 
+/// The Favorites tab placeholder
 class FavoritesTab extends StatelessWidget {
   const FavoritesTab({super.key});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Favorites')),
-      body: const Center(child: Text('Favorites functionality - Coming soon')),
+      body: const Center(child: Text('Coming soon')),
     );
   }
 }
 
+/// The Profile tab (simple welcome)
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<AuthService>();
-    final user = authService.currentUser;
-
+    final user = context.watch<AuthService>().currentUser;
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: Text('Welcome, ${user?.displayName ?? 'User'}!'),
-      );
+      body: Center(child: Text('Welcome, ${user?.displayName ?? 'User'}!')),
+    );
   }
 }

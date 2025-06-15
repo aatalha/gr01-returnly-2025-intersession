@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:returnly_app/screens/home/add_post_page.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/home/home_screen.dart';
@@ -45,8 +46,14 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/signup',
-        builder: (context, state) => const SignupScreen(),
+        path: '/',
+        builder: (context, state) => const HomeScreen(),
+        routes: [
+          GoRoute(
+            path: 'add_post',
+            builder: (context, state) => const AddPostPage(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/home',
