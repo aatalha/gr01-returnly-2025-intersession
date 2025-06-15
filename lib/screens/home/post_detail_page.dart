@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../widgets/chat_starter_widget.dart';
 
 class PostDetailSheet extends StatelessWidget {
   final Map<String, dynamic> post;
@@ -14,6 +15,7 @@ class PostDetailSheet extends StatelessWidget {
     final title = post['title'] as String? ?? '';
     final desc = post['description'] as String? ?? '';
     final userName = post['userName'] as String? ?? '';
+    final userId = post['userId'] as String? ?? '';  // Added this line
     final location = post['location'] as String? ?? '';
     final timestamp = post['timestamp'];
     final isLost = post['isLost'] ?? true;
@@ -22,7 +24,7 @@ class PostDetailSheet extends StatelessWidget {
     if (timestamp is Timestamp) {
       final date = timestamp.toDate();
       formattedDate =
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     }
 
     return Padding(
@@ -48,7 +50,7 @@ class PostDetailSheet extends StatelessWidget {
             Chip(
               label: Text(isLost ? 'LOST' : 'FOUND'),
               backgroundColor:
-                  isLost ? Colors.red.shade100 : Colors.green.shade100,
+              isLost ? Colors.red.shade100 : Colors.green.shade100,
             ),
             const SizedBox(height: 8),
             Text(desc, style: const TextStyle(fontSize: 16)),
@@ -57,6 +59,17 @@ class PostDetailSheet extends StatelessWidget {
             Text('Posted by: $userName'),
             if (formattedDate.isNotEmpty) Text('Posted at: $formattedDate'),
             const SizedBox(height: 24),
+
+            // Contact button - added here
+            ContactButton(
+              itemId: postId,
+              itemTitle: title.isNotEmpty ? title : desc, // Use title, or fallback to description
+              itemOwnerId: userId,
+              itemOwnerName: userName,
+              itemImageUrl: imageUrl,
+            ),
+
+            const SizedBox(height: 16),
             CommentsSection(postId: postId),
           ],
         ),
@@ -155,33 +168,33 @@ class _CommentsSectionState extends State<CommentsSection> {
             IconButton(
               icon: _isSending
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.send),
               onPressed: _isSending || _controller.text.trim().isEmpty
                   ? null
                   : () async {
-                      setState(() => _isSending = true);
-                      try {
-                        final user = FirebaseAuth.instance.currentUser;
-                        await FirebaseFirestore.instance
-                            .collection('posts')
-                            .doc(widget.postId)
-                            .collection('comments')
-                            .add({
-                          'text': _controller.text.trim(),
-                          'userName': user?.displayName ?? 'Anonymous',
-                          'timestamp': FieldValue.serverTimestamp(),
-                          'userId': user?.uid,
-                        });
-                        _controller.clear();
-                      } finally {
-                        if (mounted) {
-                          setState(() => _isSending = false);
-                        }
-                      }
-                    },
+                setState(() => _isSending = true);
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  await FirebaseFirestore.instance
+                      .collection('posts')
+                      .doc(widget.postId)
+                      .collection('comments')
+                      .add({
+                    'text': _controller.text.trim(),
+                    'userName': user?.displayName ?? 'Anonymous',
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'userId': user?.uid,
+                  });
+                  _controller.clear();
+                } finally {
+                  if (mounted) {
+                    setState(() => _isSending = false);
+                  }
+                }
+              },
             ),
           ],
         ),
