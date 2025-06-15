@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,59 +44,59 @@ class _AddPostPageState extends State<AddPostPage> {
   }
 
   Future<void> _submit() async {
-  if (_image == null ||
-      _selectedCategory == null ||
-      _selectedLocation == null ||
-      _descCtrl.text.trim().isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please fill all fields'))
-    );
-    return;
+    if (_image == null ||
+        _selectedCategory == null ||
+        _selectedLocation == null ||
+        _descCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill all fields'))
+      );
+      return;
+    }
+
+    setState(() { _loading = true; _progress = 0.0; });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final userName = (user?.displayName?.isNotEmpty == true)
+          ? user!.displayName
+          : (user?.email?.split('@').first ?? 'Anonymous');
+      final file = File(_image!.path);
+      final ref = FirebaseStorage.instance
+          .ref('posts/${user?.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      // 1. Add metadata with content type
+      final uploadTask = ref.putFile(
+        file,
+        SettableMetadata(contentType: 'image/jpeg'), // ✅ Add this
+      );
+      // This single await replaces the snapshotEvents listener:
+      final snapshot = await uploadTask.whenComplete(() {
+        debugPrint('Upload complete');
+      });
+
+
+      final url = await snapshot.ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('posts').add({
+        'imageUrl':    url,
+        'category':    _selectedCategory,
+        'location':    _selectedLocation,
+        'isLost':      _isLost ?? true,
+        'userId':      user?.uid,
+        'userName':    userName,
+        'timestamp':   FieldValue.serverTimestamp(),
+        'description': _descCtrl.text.trim(),
+      });
+
+      if (mounted) context.pop(); // go back to home
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting: ${e.toString()}'))
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
-
-  setState(() { _loading = true; _progress = 0.0; });
-
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = (user?.displayName?.isNotEmpty == true)
-    ? user!.displayName
-    : (user?.email?.split('@').first ?? 'Anonymous');
-    final file = File(_image!.path);
-    final ref = FirebaseStorage.instance
-        .ref('posts/${user?.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-    // 1. Add metadata with content type
-    final uploadTask = ref.putFile(
-      file,
-      SettableMetadata(contentType: 'image/jpeg'), // ✅ Add this
-    );
-    // This single await replaces the snapshotEvents listener:
-    final snapshot = await uploadTask.whenComplete(() {
-      debugPrint('Upload complete');
-    });
-
-
-    final url = await snapshot.ref.getDownloadURL();
-
-    await FirebaseFirestore.instance.collection('posts').add({
-      'imageUrl':    url,
-      'category':    _selectedCategory,
-      'location':    _selectedLocation,
-      'isLost':      _isLost ?? true, 
-      'userId':      user?.uid,
-      'userName':    userName,
-      'timestamp':   FieldValue.serverTimestamp(),
-      'description': _descCtrl.text.trim(),
-    });
-
-     if (mounted) context.pop(); // go back to home
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error posting: ${e.toString()}'))
-    );
-  } finally {
-    if (mounted) setState(() => _loading = false);
-  }
-}
 
 
   @override
@@ -131,11 +132,11 @@ class _AddPostPageState extends State<AddPostPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: _image == null
-                ? const Icon(Icons.add_a_photo, size: 48, color: Colors.grey)
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(File(_image!.path), fit: BoxFit.cover),
-                  ),
+                  ? const Icon(Icons.add_a_photo, size: 48, color: Colors.grey)
+                  : ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(File(_image!.path), fit: BoxFit.cover),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -147,7 +148,7 @@ class _AddPostPageState extends State<AddPostPage> {
               border: UnderlineInputBorder(),
             ),
             items: _categories.map((c) =>
-              DropdownMenuItem(value: c, child: Text(c))
+                DropdownMenuItem(value: c, child: Text(c))
             ).toList(),
             value: _selectedCategory,
             onChanged: (val) => setState(() => _selectedCategory = val),
@@ -161,14 +162,14 @@ class _AddPostPageState extends State<AddPostPage> {
               border: UnderlineInputBorder(),
             ),
             items: _locations.map((l) =>
-              DropdownMenuItem(value: l, child: Text(l))
+                DropdownMenuItem(value: l, child: Text(l))
             ).toList(),
             value: _selectedLocation,
             onChanged: (val) => setState(() => _selectedLocation = val),
           ),
           const SizedBox(height: 20),
           // inside your Column, after Location dropdown
-          const Text('Item status'),  
+          const Text('Item status'),
           Row(children: [
             Expanded(child: RadioListTile<bool>(
               title: const Text('Lost'),
@@ -200,8 +201,8 @@ class _AddPostPageState extends State<AddPostPage> {
             child: ElevatedButton(
               onPressed: _loading ? null : _submit,
               child: _loading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Post'),
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Post'),
             ),
           ),
         ]),
