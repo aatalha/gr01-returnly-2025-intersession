@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,9 +20,23 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  StreamSubscription<User?>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to auth state changes and redirect when user signs up
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null && mounted) {
+        // User signed up, navigate to home
+        context.go('/');
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _usernameCtrl.dispose();
     _emailCtrl.dispose();
     _pwCtrl.dispose();
@@ -54,18 +69,12 @@ class _SignupScreenState extends State<SignupScreen> {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign Up successful!')),
-      );
-      context.go('/'); // navigate to home
+      // Don't navigate here - let the auth state listener handle it
     } on FirebaseAuthException catch (e) {
       if (mounted) setState(() => _isLoading = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message ?? 'Sign-up failed')));
     } catch (e) {
-      print(e);
       if (mounted) setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('An unexpected error occurred during Sign Up')),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -16,9 +17,23 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pwCtrl = TextEditingController();
   bool _obscurePw = true;
   bool _isLoading = false;
+  StreamSubscription<User?>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to auth state changes and redirect when user signs in
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null && mounted) {
+        // User signed in, navigate to home
+        context.go('/');
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _emailCtrl.dispose();
     _pwCtrl.dispose();
     super.dispose();
@@ -26,28 +41,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
+
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailCtrl.text.trim(),
         password: _pwCtrl.text,
       );
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log In successful!')),
-      );
-      context.go('/');
+      // Don't navigate here - let the auth state listener handle it
+
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+
+      String errorMessage = 'Sign in failed';
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'No user found for that email.';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Wrong password provided.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Invalid email address.';
+          break;
+        case 'user-disabled':
+          errorMessage = 'This account has been disabled.';
+          break;
+        default:
+          errorMessage = e.message ?? 'Sign in failed';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Sign In error')),
+        SnackBar(content: Text(errorMessage)),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('An unexpected error occurred during Sign In')),
+        const SnackBar(content: Text('An unexpected error occurred')),
       );
     }
   }
@@ -62,7 +93,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Scrollable content
             Expanded(
               child: SingleChildScrollView(
                 child: Padding(
@@ -71,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Logo Container - Fixed position
+                      // Logo Container
                       Container(
                         height: 160,
                         width: double.infinity,
@@ -119,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 40),
 
-                      // Title and Subtitle - Fixed position
+                      // Title and Subtitle
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Column(
@@ -145,9 +175,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 32),
 
-                      // Form Fields Container - Fixed height to accommodate all forms
+                      // Form Fields
                       SizedBox(
-                        height: 200, // Fixed height for consistent button positioning
+                        height: 200,
                         child: Column(
                           children: [
                             // Email Field
@@ -199,9 +229,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
 
-                            const Spacer(), // This pushes the button to stay in consistent position
+                            const Spacer(),
 
-                            // Sign In Button - Will be in same position as Get Started button
+                            // Sign In Button
                             SizedBox(
                               width: double.infinity,
                               height: 50,
@@ -239,9 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Forgot Password Link - Fixed position
+                      // Forgot Password Link
                       SizedBox(
-                        height: 40, // Fixed height for consistent spacing
+                        height: 40,
                         child: TextButton(
                           onPressed: () => context.go('/forgot_password'),
                           child: Text(
@@ -259,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            // Fixed Bottom Section
+            // Bottom Navigation
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
               child: Container(

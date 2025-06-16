@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -39,7 +37,6 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return result;
     } catch (e) {
-      print("something went wrong while signing up: $e");
       rethrow;
     }
   }
@@ -57,7 +54,6 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return result;
     } catch (e) {
-      print('Sign in error: $e');
       rethrow;
     }
   }
@@ -68,7 +64,6 @@ class AuthService extends ChangeNotifier {
       await _auth.signOut();
       notifyListeners();
     } catch (e) {
-      print('Sign out error: $e');
       rethrow;
     }
   }
@@ -78,9 +73,7 @@ class AuthService extends ChangeNotifier {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
-      print('Reset password error: $e');
       rethrow;
     }
   }
-  
 }
