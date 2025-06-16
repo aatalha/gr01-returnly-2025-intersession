@@ -72,17 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
-              child: Image.network(
-                'https://firebasestorage.googleapis.com/v0/b/gr1-returnly-2025-intersession.appspot.com/o/assets%2FReturnly%20logo.png?alt=media&token=a1091991-4ac8-40ef-b515-c3957ff5b928',
-                height: 120,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const CircularProgressIndicator();
-                },
-                errorBuilder: (context, error, stackTrace) =>
-                  const Text('Could not load logo'),
-              ),
+              child: Image.asset('lib/images/Returnlylogo.png',),
             ),
           ),
 

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +45,15 @@ class _SignupScreenState extends State<SignupScreen> {
     // save display name
     await cred.user?.updateDisplayName(_usernameCtrl.text.trim());
     await cred.user?.reload();
+    final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email,
+          'name': _usernameCtrl.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
     if (!mounted) return;
     setState(() => _isLoading = false); 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -55,6 +65,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(e.message ?? 'Sign-up failed')));
   } catch (e) {
+    print(e);
     if (mounted) setState(() => _isLoading = false); 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('An unexpected error occurred during Sign Up')),
@@ -84,7 +95,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 color: theme.colorScheme.secondary.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Center(child: Text('Your Logo Here')),
+              child: Image.asset('lib/images/Returnlylogo.png'),
             ),
 
             // ← Title + subtitle
