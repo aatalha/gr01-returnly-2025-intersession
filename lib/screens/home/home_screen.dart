@@ -52,6 +52,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.grey[900]! : const Color(0xFFFEFAF6);
+    final surfaceColor = isDarkMode ? Colors.grey[850]! : Colors.white;
+    final borderColor = isDarkMode ? Colors.grey[700]! : const Color(0xFFEADBC8);
+
     final List<Widget> screens = [
       const HomeTab(),
       const ChatTab(),
@@ -59,60 +64,84 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       body: screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (idx) => setState(() => _currentIndex = idx),
-        type: BottomNavigationBarType.fixed,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          border: Border(
+            top: BorderSide(
+              color: borderColor,
+              width: 1,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: StreamBuilder<int>(
-              stream: _chatService.getUnreadMessagesCountStream(),
-              builder: (context, snapshot) {
-                final unreadCount = snapshot.data ?? 0;
-                return Stack(
-                  children: [
-                    const Icon(Icons.favorite),
-                    if (unreadCount > 0)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            unreadCount > 99 ? '99+' : unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: backgroundColor,
+          selectedItemColor: const Color(0xFF102C57),
+          unselectedItemColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _currentIndex,
+          onTap: (idx) => setState(() => _currentIndex = idx),
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: StreamBuilder<int>(
+                stream: _chatService.getUnreadMessagesCountStream(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  return Stack(
+                    children: [
+                      // Use proper chat icon instead of heart
+                      Icon(
+                        _currentIndex == 1 ? Icons.chat : Icons.chat_outlined,
+                        color: _currentIndex == 1
+                            ? const Color(0xFF102C57)
+                            : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            textAlign: TextAlign.center,
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              unreadCount > 99 ? '99+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
+              label: 'Chat',
             ),
-            label: 'Chat',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -266,10 +295,18 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.grey[900]! : const Color(0xFFFEFAF6);
+    final surfaceColor = isDarkMode ? Colors.grey[850]! : Colors.white;
+    final filterBackgroundColor = isDarkMode ? Colors.grey[800]! : const Color(0xFFFEFAF6);
+
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text('Returnly'),
         elevation: 0,
+        backgroundColor: backgroundColor,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -316,7 +353,7 @@ class _HomeTabState extends State<HomeTab> {
             children: [
               // Search bar and filters
               Container(
-                color: Colors.grey[50],
+                color: filterBackgroundColor,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
@@ -339,7 +376,7 @@ class _HomeTabState extends State<HomeTab> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: surfaceColor,
                       ),
                       onSubmitted: (value) {
                         _performSearch(); // Search when Enter is pressed
@@ -443,7 +480,7 @@ class _HomeTabState extends State<HomeTab> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: surfaceColor,
                       ),
                       items: [
                         const DropdownMenuItem<String?>(
@@ -480,7 +517,7 @@ class _HomeTabState extends State<HomeTab> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: surfaceColor,
                       ),
                       items: [
                         const DropdownMenuItem<String?>(
@@ -559,14 +596,14 @@ class _HomeTabState extends State<HomeTab> {
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: surfaceColor,
                           borderRadius: BorderRadius.circular(12),
                           border: isHighPriority
                               ? Border.all(color: Colors.orange, width: 2)
                               : null,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
+                              color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.1),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             )
@@ -739,15 +776,17 @@ class _HomeTabState extends State<HomeTab> {
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade50,
+                                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                           borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: Colors.grey.shade200),
+                                          border: Border.all(
+                                            color: isDarkMode ? Colors.grey[700]! : Colors.grey.shade200,
+                                          ),
                                         ),
                                         child: Text(
                                           description,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
-                                            color: Colors.black87,
+                                            color: isDarkMode ? Colors.grey[300] : Colors.black87,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
@@ -789,6 +828,8 @@ class _HomeTabState extends State<HomeTab> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/home/add_post'),
         tooltip: 'Add a Post',
+        backgroundColor: const Color(0xFF102C57),
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
     );
