@@ -6,6 +6,7 @@ import 'package:returnly_app/screens/profile/account_settings.dart';
 import 'package:returnly_app/screens/splash_screen.dart';
 import 'package:returnly_app/screens/home/home_screen.dart';
 import 'package:returnly_app/screens/home/add_post_page.dart';
+import 'package:returnly_app/screens/home/edit_post_screen.dart';
 import 'package:returnly_app/screens/profile/about_us_screen.dart';
 import 'package:returnly_app/screens/profile/privacy_policy_screen.dart';
 import 'package:returnly_app/screens/profile/terms_conditions_screen.dart';
@@ -90,7 +91,6 @@ class AppRouter {
           );
         },
       ),
-      // TODO: Developer B will add direct notification routes here later
     ],
   );
 }
