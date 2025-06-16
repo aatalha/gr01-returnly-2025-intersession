@@ -19,10 +19,11 @@ class AddPostPage extends StatefulWidget {
 class _AddPostPageState extends State<AddPostPage> {
   final _picker = ImagePicker();
   XFile? _image;
+  final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   bool _loading = false;
   double _progress = 0.0;
-  bool? _isLost;
+  bool _isHighPriority = false;
 
   // Dropdown options
   final List<String> _categories = [
@@ -36,6 +37,11 @@ class _AddPostPageState extends State<AddPostPage> {
     'Student Services','Computer Science Building','Other Location'
   ];
 
+  // High priority categories that auto-suggest high priority
+  final List<String> _highPriorityCategories = [
+    'Documents', 'Keys', 'Electronics' // Important items
+  ];
+
   String? _selectedCategory;
   String? _selectedLocation;
 
@@ -44,13 +50,23 @@ class _AddPostPageState extends State<AddPostPage> {
     if (picked != null) setState(() => _image = picked);
   }
 
+  void _onCategoryChanged(String? category) {
+    setState(() {
+      _selectedCategory = category;
+      // Auto-suggest high priority for important categories
+      if (category != null && _highPriorityCategories.contains(category)) {
+        _isHighPriority = true;
+      }
+    });
+  }
+
   Future<void> _submit() async {
-    if (_image == null ||
-        _selectedCategory == null ||
+    if (_selectedCategory == null ||
         _selectedLocation == null ||
+        _titleCtrl.text.trim().isEmpty ||
         _descCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all fields'))
+          const SnackBar(content: Text('Please fill in title, description, category, and location'))
       );
       return;
     }
@@ -62,34 +78,51 @@ class _AddPostPageState extends State<AddPostPage> {
       final userName = (user?.displayName?.isNotEmpty == true)
           ? user!.displayName
           : (user?.email?.split('@').first ?? 'Anonymous');
-      final file = File(_image!.path);
-      final ref = FirebaseStorage.instance
-          .ref('posts/${user?.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      // 1. Add metadata with content type
-      final uploadTask = ref.putFile(
-        file,
-        SettableMetadata(contentType: 'image/jpeg'), // ✅ Add this
-      );
-      // This single await replaces the snapshotEvents listener:
-      final snapshot = await uploadTask.whenComplete(() {
-        debugPrint('Upload complete');
-      });
 
+      String imageUrl = '';
 
-      final url = await snapshot.ref.getDownloadURL();
+      // Only upload image if one is selected
+      if (_image != null) {
+        final file = File(_image!.path);
+        final ref = FirebaseStorage.instance
+            .ref('posts/${user?.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+        final uploadTask = ref.putFile(
+          file,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+
+        final snapshot = await uploadTask.whenComplete(() {
+          debugPrint('Upload complete');
+        });
+
+        imageUrl = await snapshot.ref.getDownloadURL();
+      }
 
       await FirebaseFirestore.instance.collection('posts').add({
-        'imageUrl':    url,
-        'category':    _selectedCategory,
-        'location':    _selectedLocation,
-        'isLost':      _isLost ?? true,
-        'userId':      user?.uid,
-        'userName':    userName,
-        'timestamp':   FieldValue.serverTimestamp(),
-        'description': _descCtrl.text.trim(),
+        'title':         _titleCtrl.text.trim(),
+        'imageUrl':      imageUrl, // Will be empty string if no image
+        'category':      _selectedCategory,
+        'location':      _selectedLocation,
+        'isHighPriority': _isHighPriority,
+        'status':        'active',
+        'userId':        user?.uid,
+        'userName':      userName,
+        'timestamp':     FieldValue.serverTimestamp(),
+        'description':   _descCtrl.text.trim(),
       });
 
-      if (mounted) context.pop(); // go back to home
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isHighPriority
+                ? 'High priority item posted! Users will be notified.'
+                : 'Item posted successfully!'),
+            backgroundColor: _isHighPriority ? Colors.orange : Colors.green,
+          ),
+        );
+        context.pop(); // go back to home
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error posting: ${e.toString()}'))
@@ -99,9 +132,9 @@ class _AddPostPageState extends State<AddPostPage> {
     }
   }
 
-
   @override
   void dispose() {
+    _titleCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -110,8 +143,11 @@ class _AddPostPageState extends State<AddPostPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-
+        title: const Text('Post Found Item'),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop()
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -123,6 +159,8 @@ class _AddPostPageState extends State<AddPostPage> {
           ] else ...[
             const SizedBox(height: 16),
           ],
+
+          // Image picker
           GestureDetector(
             onTap: _pickImage,
             child: Container(
@@ -131,13 +169,35 @@ class _AddPostPageState extends State<AddPostPage> {
               decoration: BoxDecoration(
                 color: Colors.grey[200],
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.grey[300]!,
+                  width: 2,
+                ),
               ),
               child: _image == null
-                  ? const Icon(Icons.add_a_photo, size: 48, color: Colors.grey)
+                  ? const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo, size: 48, color: Colors.grey),
+                  SizedBox(height: 8),
+                  Text('Tap to add photo', style: TextStyle(color: Colors.grey)),
+                ],
+              )
                   : ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.file(File(_image!.path), fit: BoxFit.cover),
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title field
+          TextField(
+            controller: _titleCtrl,
+            decoration: InputDecoration(
+              labelText: 'Item Title',
+              hintText: 'e.g., Black iPhone 13, Blue Backpack',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 12),
@@ -152,14 +212,14 @@ class _AddPostPageState extends State<AddPostPage> {
                 DropdownMenuItem(value: c, child: Text(c))
             ).toList(),
             value: _selectedCategory,
-            onChanged: (val) => setState(() => _selectedCategory = val),
+            onChanged: _onCategoryChanged,
           ),
           const SizedBox(height: 12),
 
           // Location dropdown
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(
-              labelText: 'Location',
+              labelText: 'Where did you find it?',
               border: UnderlineInputBorder(),
             ),
             items: _locations.map((l) =>
@@ -169,20 +229,34 @@ class _AddPostPageState extends State<AddPostPage> {
             onChanged: (val) => setState(() => _selectedLocation = val),
           ),
           const SizedBox(height: 20),
-          // inside your Column, after Location dropdown
-          const Text('Item status'),
-          Row(children: [
-            Expanded(child: RadioListTile<bool>(
-              title: const Text('Lost'),
-              value: true, groupValue: _isLost,
-              onChanged: (v) => setState(() => _isLost = v),
-            )),
-            Expanded(child: RadioListTile<bool>(
-              title: const Text('Found'),
-              value: false, groupValue: _isLost,
-              onChanged: (v) => setState(() => _isLost = v),
-            )),
-          ]),
+
+          // High Priority Toggle
+          Container(
+            decoration: BoxDecoration(
+              color: _isHighPriority ? Colors.orange.shade50 : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _isHighPriority ? Colors.orange.shade200 : Colors.grey.shade300,
+              ),
+            ),
+            child: SwitchListTile(
+              title: const Text('High Priority Item'),
+              subtitle: Text(
+                _isHighPriority
+                    ? '⚠️ Important item - users will be notified immediately'
+                    : 'Mark as high priority for important items (ID, keys, wallet, etc.)',
+                style: TextStyle(
+                  color: _isHighPriority ? Colors.orange.shade700 : Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+              ),
+              value: _isHighPriority,
+              onChanged: (value) => setState(() => _isHighPriority = value),
+              activeColor: Colors.orange,
+            ),
+          ),
+
+          const SizedBox(height: 16),
 
           // Description
           TextField(
@@ -190,6 +264,7 @@ class _AddPostPageState extends State<AddPostPage> {
             maxLines: 3,
             decoration: InputDecoration(
               labelText: 'Description',
+              hintText: 'Additional details that might help identify the owner...',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
@@ -200,10 +275,13 @@ class _AddPostPageState extends State<AddPostPage> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isHighPriority ? Colors.orange : null,
+              ),
               onPressed: _loading ? null : _submit,
               child: _loading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Post'),
+                  : Text(_isHighPriority ? 'Post High Priority Item' : 'Post Found Item'),
             ),
           ),
         ]),
