@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_service.dart';  // Added
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -34,6 +35,9 @@ class AuthService extends ChangeNotifier {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // Initialize notifications for new user
+      await NotificationService.initialize();
+
       notifyListeners();
       return result;
     } catch (e) {
@@ -51,6 +55,10 @@ class AuthService extends ChangeNotifier {
         email: email,
         password: password,
       );
+
+      // Re-initialize notifications for returning user
+      await NotificationService.initialize();
+
       notifyListeners();
       return result;
     } catch (e) {
@@ -61,6 +69,9 @@ class AuthService extends ChangeNotifier {
   // Sign out
   Future<void> signOut() async {
     try {
+      // Clear FCM token before signing out
+      await NotificationService.clearFCMToken();
+
       await _auth.signOut();
       notifyListeners();
     } catch (e) {

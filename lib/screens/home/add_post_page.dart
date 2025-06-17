@@ -8,6 +8,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/auth_service.dart';
+import '../../services/notification_service.dart';  // Added
 
 class AddPostPage extends StatefulWidget {
   const AddPostPage({super.key});
@@ -99,7 +100,8 @@ class _AddPostPageState extends State<AddPostPage> {
         imageUrl = await snapshot.ref.getDownloadURL();
       }
 
-      await FirebaseFirestore.instance.collection('posts').add({
+      // Add post to Firestore
+      final docRef = await FirebaseFirestore.instance.collection('posts').add({
         'title':         _titleCtrl.text.trim(),
         'imageUrl':      imageUrl, // Will be empty string if no image
         'category':      _selectedCategory,
@@ -111,6 +113,16 @@ class _AddPostPageState extends State<AddPostPage> {
         'timestamp':     FieldValue.serverTimestamp(),
         'description':   _descCtrl.text.trim(),
       });
+
+      // Send high priority notification if needed
+      if (_isHighPriority) {
+        await NotificationService.sendHighPriorityItemNotification(
+          title: _titleCtrl.text.trim(),
+          location: _selectedLocation!,
+          category: _selectedCategory!,
+          postId: docRef.id,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
