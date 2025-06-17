@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';  // Add this import
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_mode_notifier.dart';
@@ -44,9 +45,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // letting theme control background, icons, text style
       ),
-      // scaffoldBackgroundColor comes from theme
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         children: [
@@ -54,7 +53,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           Text('Edit Name', style: textTheme.titleMedium),
           const SizedBox(height: 8),
           Card(
-            // uses cardTheme.surface color
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -71,21 +69,57 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     height: 38,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(120, 36), // Minimum width 120, height 36
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0), // Horizontal padding
-                            ),
+                        minimumSize: const Size(120, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      ),
                       onPressed: _savingName ? null : () async {
-                        setState(() { _savingName = true; _message = null; });
+                        setState(() { 
+                          _savingName = true; 
+                          _message = null; 
+                        });
+                        
                         try {
-                          await user?.updateDisplayName(_nameController.text.trim());
+                          final newName = _nameController.text.trim();
+                          if (newName.isEmpty) {
+                            setState(() { 
+                              _message = "Name cannot be empty"; 
+                            });
+                            return;
+                          }
+
+                          // Update Firebase Auth display name
+                          await user?.updateDisplayName(newName);
                           await user?.reload();
-                          setState(() { _message = "Username updated!"; });
+                          
+                          // Update Firestore user document (set with merge for both new and existing users)
+                          if (user?.uid != null) {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user!.uid)
+                                .set({
+                              'name': newName,
+                              'displayName': newName, // for compatibility
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            }, SetOptions(merge: true));
+                          }
+                          
+                          // Notify AuthService of changes
+                          authService.notifyListeners();
+                          
+                          setState(() { 
+                            _message = "Username updated successfully!"; 
+                          });
                         } catch (e) {
-                          setState(() { _message = "Failed: $e"; });
+                          setState(() { 
+                            _message = "Failed to update username: ${e.toString()}"; 
+                          });
                         } finally {
-                          setState(() { _savingName = false; });
+                          setState(() { 
+                            _savingName = false; 
+                          });
                         }
                       },
+
                       child: _savingName
                         ? const SizedBox(
                             width: 18, height: 18,
@@ -121,6 +155,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: "New Password",
+                      helperText: "Password must be at least 6 characters",
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -129,10 +164,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     height: 38,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(120, 36), // Minimum width 120, height 36
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0), // Horizontal padding
-                            ),
-                      // Inside your onPressed for "Change Password":
+                        minimumSize: const Size(120, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      ),
                       onPressed: _savingPw ? null : () async {
                         setState(() {
                           _savingPw = true;
@@ -140,36 +174,59 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         });
 
                         try {
-                          // 1) Reauthenticate
-                          final cred = EmailAuthProvider.credential(
+                          // Validate inputs
+                          if (_currentPwController.text.trim().isEmpty) {
+                            setState(() {
+                              _message = "Please enter your current password";
+                            });
+                            return;
+                          }
+                          
+                          if (_newPwController.text.trim().length < 6) {
+                            setState(() {
+                              _message = "New password must be at least 6 characters";
+                            });
+                            return;
+                          }
+
+                          // Reauthenticate with current password
+                          final credential = EmailAuthProvider.credential(
                             email: user!.email!,
                             password: _currentPwController.text.trim(),
                           );
-                          await user.reauthenticateWithCredential(cred);
+                          await user.reauthenticateWithCredential(credential);
 
-                          // 2) If that succeeds, update to the new password
+                          // Update to new password
                           await user.updatePassword(_newPwController.text.trim());
+                          
+                          // Clear password fields
+                          _currentPwController.clear();
+                          _newPwController.clear();
+                          
                           setState(() {
-                            _message = "Password updated!";
+                            _message = "Password updated successfully!";
                           });
                         } on FirebaseAuthException catch (e) {
-                          // Friendly, specific messages
-                          if (e.code == 'wrong-password') {
-                            setState(() {
-                              _message = "Current password is incorrect.";
-                            });
-                          } else if (e.code == 'weak-password') {
-                            setState(() {
-                              _message = "Your new password is too weak.";
-                            });
-                          } else {
-                            setState(() {
-                              _message = "Error: ${e.message}";
-                            });
+                          String errorMessage;
+                          switch (e.code) {
+                            case 'wrong-password':
+                              errorMessage = "Current password is incorrect";
+                              break;
+                            case 'weak-password':
+                              errorMessage = "New password is too weak";
+                              break;
+                            case 'requires-recent-login':
+                              errorMessage = "Please log out and log back in before changing password";
+                              break;
+                            default:
+                              errorMessage = "Error: ${e.message}";
                           }
+                          setState(() {
+                            _message = errorMessage;
+                          });
                         } catch (e) {
                           setState(() {
-                            _message = "Unexpected error: $e";
+                            _message = "Unexpected error: ${e.toString()}";
                           });
                         } finally {
                           setState(() {
@@ -177,7 +234,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           });
                         }
                       },
-
                       child: _savingPw
                         ? const SizedBox(
                             width: 18, height: 18,
@@ -209,12 +265,22 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           if (_message != null) ...[
             const SizedBox(height: 24),
             Center(
-              child: Text(
-                _message!,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: _message!.contains("Failed")
-                      ? colorScheme.error
-                      : colorScheme.primary,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _message!.toLowerCase().contains("success") 
+                      ? colorScheme.primaryContainer 
+                      : colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _message!,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _message!.toLowerCase().contains("success")
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onErrorContainer,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
