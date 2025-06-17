@@ -9,7 +9,11 @@ class ChatService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Collection references
+  // Collection references - made public for chat list access
+  CollectionReference get chatsCollection => _firestore.collection('chats');
+  CollectionReference get messagesCollection => _firestore.collection('messages');
+
+  // Keep private references for internal use
   CollectionReference get _chatsCollection => _firestore.collection('chats');
   CollectionReference get _messagesCollection => _firestore.collection('messages');
 
@@ -70,8 +74,6 @@ class ChatService {
 
       final docRef = await _chatsCollection.add(chatData.toFirestore());
 
-
-
       return docRef.id;
     } catch (e) {
       print('Error creating/getting chat: $e');
@@ -91,8 +93,11 @@ class ChatService {
       if (user == null) throw Exception('User not authenticated');
 
       String? imageUrl;
-      if (imageFile != null) {
+      // FIXED: Only try to upload image if imageFile is provided AND type is image
+      if (imageFile != null && type == MessageType.image) {
+        print('Uploading image...');
         imageUrl = await _uploadChatImage(imageFile, chatId);
+        print('Image uploaded: $imageUrl');
       }
 
       final chatMessage = ChatMessage(
@@ -104,14 +109,31 @@ class ChatService {
         message: message,
         timestamp: DateTime.now(),
         type: type,
-        imageUrl: imageUrl,
+        isRead: false, // Explicitly set to false for new messages
+        imageUrl: imageUrl, // This will be null for text messages, which is fine
       );
 
-      // Add message to messages collection
-      await _messagesCollection.add(chatMessage.toFirestore());
+      print('Sending message to Firestore...');
 
-      // Update chat conversation with latest message info
-      await _updateChatLastMessage(chatId, message, user.uid);
+      // Use a batch to do both operations atomically (reduces rebuilds)
+      final batch = _firestore.batch();
+
+      // Add message to messages collection
+      final messageRef = _messagesCollection.doc();
+      batch.set(messageRef, chatMessage.toFirestore());
+
+      // Update chat conversation with latest message info in the same batch
+      final chatRef = _chatsCollection.doc(chatId);
+      batch.update(chatRef, {
+        'lastMessage': message.isEmpty ? 'Image' : message, // Show "Image" for image messages
+        'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+        'lastMessageSenderId': user.uid,
+      });
+
+      // Execute both operations at once
+      await batch.commit();
+
+      print('Message sent and chat updated in single batch');
 
     } catch (e) {
       print('Error sending message: $e');
@@ -122,27 +144,54 @@ class ChatService {
   // Upload chat image
   Future<String> _uploadChatImage(File imageFile, String chatId) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final storageRef = _storage.ref().child('chat_images/$chatId/$fileName');
+      print('Starting image upload for chat: $chatId');
 
-      final uploadTask = await storageRef.putFile(imageFile);
-      return await uploadTask.ref.getDownloadURL();
+      final fileName = 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storageRef = _storage.ref().child('chat_images/$fileName');
+
+      print('Uploading to path: chat_images/$fileName');
+
+      // Add timeout and better error handling
+      final uploadTask = storageRef.putFile(
+        imageFile,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      // Wait for upload with timeout
+      final snapshot = await uploadTask.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          throw Exception('Upload timeout - please check your internet connection');
+        },
+      );
+
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      print('Image upload completed: $downloadUrl');
+      return downloadUrl;
+
     } catch (e) {
-      print('Error uploading chat image: $e');
+      print('Error uploading image: $e');
       rethrow;
     }
   }
 
-  // Update chat with last message info
+  // Update chat with last message info and increment unread count
   Future<void> _updateChatLastMessage(String chatId, String message, String senderId) async {
     try {
-      await _chatsCollection.doc(chatId).update({
+      final updateData = {
         'lastMessage': message,
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
         'lastMessageSenderId': senderId,
-      });
+      };
+
+      await _chatsCollection.doc(chatId).update(updateData);
+
+      // Reduced logging - only essential info
+      print('Chat $chatId updated');
     } catch (e) {
       print('Error updating chat last message: $e');
+      rethrow;
     }
   }
 
@@ -182,65 +231,71 @@ class ChatService {
       final userId = currentUser?.uid;
       if (userId == null) return;
 
-      // Get unread messages from other users
+      // Get unread messages from other users in this specific chat
       final unreadMessages = await _messagesCollection
           .where('chatId', isEqualTo: chatId)
-          .where('senderId', isNotEqualTo: userId)
           .where('isRead', isEqualTo: false)
           .get();
 
-      // Mark them as read
-      final batch = _firestore.batch();
-      for (var doc in unreadMessages.docs) {
-        batch.update(doc.reference, {'isRead': true});
+      if (unreadMessages.docs.isEmpty) {
+        return; // No unread messages, don't do anything
       }
-      await batch.commit();
 
-      // Reset unread count in chat
-      await _chatsCollection.doc(chatId).update({'unreadCount': 0});
+      // Mark them as read (only messages not sent by current user)
+      final batch = _firestore.batch();
+      int markedCount = 0;
+
+      for (var doc in unreadMessages.docs) {
+        final message = ChatMessage.fromFirestore(doc);
+        if (message.senderId != userId) {
+          batch.update(doc.reference, {'isRead': true});
+          markedCount++;
+        }
+      }
+
+      if (markedCount > 0) {
+        await batch.commit();
+        print('Marked $markedCount messages as read');
+
+        // Reset unread count in chat
+        await _chatsCollection.doc(chatId).update({'unreadCount': 0});
+      }
     } catch (e) {
       print('Error marking messages as read: $e');
     }
   }
 
-  // Get unread messages count for user
+  // FIXED: Get unread messages count for user - using direct message stream for real-time updates
   Stream<int> getUnreadMessagesCountStream() {
     final userId = currentUser?.uid;
     if (userId == null) return Stream.value(0);
 
-    return _chatsCollection
-        .where('participantIds', arrayContains: userId)
+    // Listen directly to unread messages and filter by chat participation
+    return _messagesCollection
+        .where('isRead', isEqualTo: false)
         .snapshots()
         .asyncMap((snapshot) async {
       int totalUnread = 0;
 
-      for (var doc in snapshot.docs) {
-        final chat = ChatConversation.fromFirestore(doc);
-        // Only count unread if the last message wasn't sent by current user
-        if (chat.lastMessageSenderId != userId) {
-          final unreadCount = await _getUnreadCountForChat(chat.id, userId);
-          totalUnread += unreadCount;
+      // Get user's active chats once
+      final userChatsSnapshot = await _chatsCollection
+          .where('participantIds', arrayContains: userId)
+          .where('status', isEqualTo: ChatStatus.active.toString())
+          .get();
+
+      final userChatIds = userChatsSnapshot.docs.map((doc) => doc.id).toSet();
+
+      // Count unread messages in user's chats that weren't sent by them
+      for (var messageDoc in snapshot.docs) {
+        final message = ChatMessage.fromFirestore(messageDoc);
+        if (message.senderId != userId && userChatIds.contains(message.chatId)) {
+          totalUnread++;
         }
       }
 
+      print('Real-time unread count: $totalUnread');
       return totalUnread;
     });
-  }
-
-  // Get unread count for specific chat
-  Future<int> _getUnreadCountForChat(String chatId, String userId) async {
-    try {
-      final unreadMessages = await _messagesCollection
-          .where('chatId', isEqualTo: chatId)
-          .where('senderId', isNotEqualTo: userId)
-          .where('isRead', isEqualTo: false)
-          .get();
-
-      return unreadMessages.docs.length;
-    } catch (e) {
-      print('Error getting unread count: $e');
-      return 0;
-    }
   }
 
   // Archive a chat

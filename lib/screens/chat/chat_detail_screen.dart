@@ -55,6 +55,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _sendMessage({File? imageFile}) async {
     final message = _messageController.text.trim();
+
+    // FIXED: Allow sending if either message has content OR imageFile exists
     if (message.isEmpty && imageFile == null) return;
 
     setState(() => _isSending = true);
@@ -62,17 +64,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     try {
       await _chatService.sendMessage(
         chatId: widget.chatId,
-        message: message,
+        // FIXED: For image messages, send either the message text or empty string
+        message: imageFile != null ? (message.isEmpty ? "" : message) : message,
         type: imageFile != null ? MessageType.image : MessageType.text,
         imageFile: imageFile,
       );
 
       _messageController.clear();
 
-      // Scroll to bottom after sending message
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
+      // REMOVED: The automatic scroll after sending - this was causing the weird behavior
+      // The ListView will handle scrolling automatically when new messages arrive
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -219,22 +221,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   );
                 }
 
-                // Auto-scroll to bottom when new messages arrive
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollToBottom();
-                  }
-                });
+                // REMOVED: The automatic scroll in the StreamBuilder - this was also causing issues
+                // Let the ListView handle its own scrolling naturally
 
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
+                  reverse: true, // This makes the ListView start from the bottom
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final message = messages[index];
+                    // Reverse the index since we're using reverse: true
+                    final reversedIndex = messages.length - 1 - index;
+                    final message = messages[reversedIndex];
                     final isCurrentUser = message.senderId == _chatService.currentUser?.uid;
-                    final showTimestamp = index == 0 ||
-                        messages[index - 1].timestamp.difference(message.timestamp).inMinutes.abs() > 5;
+                    final showTimestamp = reversedIndex == 0 ||
+                        messages[reversedIndex - 1].timestamp.difference(message.timestamp).inMinutes.abs() > 5;
 
                     return Column(
                       children: [

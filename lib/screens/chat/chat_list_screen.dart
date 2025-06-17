@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/chat_message_model.dart';
 import '../../services/chat_service.dart';
 import '../../widgets/custom_text_field.dart';
@@ -241,102 +242,107 @@ class _ChatListScreenState extends State<ChatListScreen> {
           }
         }
       },
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundImage: chat.itemImageUrl.isNotEmpty
-              ? NetworkImage(chat.itemImageUrl)
-              : null,
-          child: chat.itemImageUrl.isEmpty
-              ? Text(otherUserName.isNotEmpty ? otherUserName[0].toUpperCase() : '?')
-              : null,
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                otherUserName,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: _chatService.messagesCollection
+            .where('chatId', isEqualTo: chat.id)
+            .where('isRead', isEqualTo: false)
+            .snapshots(),
+        builder: (context, unreadSnapshot) {
+          // Check if there are unread messages NOT sent by current user
+          bool hasUnread = false;
+          if (unreadSnapshot.hasData) {
+            final userId = _chatService.currentUser?.uid;
+            for (var doc in unreadSnapshot.data!.docs) {
+              final message = ChatMessage.fromFirestore(doc);
+              if (message.senderId != userId) {
+                hasUnread = true;
+                break;
+              }
+            }
+          }
+
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundImage: chat.itemImageUrl.isNotEmpty
+                  ? NetworkImage(chat.itemImageUrl)
+                  : null,
+              child: chat.itemImageUrl.isEmpty
+                  ? Text(otherUserName.isNotEmpty ? otherUserName[0].toUpperCase() : '?')
+                  : null,
             ),
-            Text(
-              _formatTimestamp(chat.lastMessageTime),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'About: ${chat.itemTitle}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.blue,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Row(
+            title: Row(
               children: [
-                if (isCurrentUserSender)
-                  const Icon(Icons.check, size: 14, color: Colors.grey),
-                if (isCurrentUserSender)
-                  const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    chat.lastMessage.isEmpty ? 'No messages yet' : chat.lastMessage,
+                    otherUserName,
                     style: TextStyle(
-                      color: chat.unreadCount > 0 && !isCurrentUserSender
-                          ? Colors.black
-                          : Colors.grey,
-                      fontWeight: chat.unreadCount > 0 && !isCurrentUserSender
-                          ? FontWeight.w600
-                          : FontWeight.normal,
+                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (chat.unreadCount > 0 && !isCurrentUserSender)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      chat.unreadCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                Text(
+                  _formatTimestamp(chat.lastMessageTime),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasUnread ? Colors.black : Colors.grey,
+                    fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
                   ),
+                ),
               ],
             ),
-          ],
-        ),
-        onTap: () async {
-          // Mark messages as read when opening chat
-          await _chatService.markMessagesAsRead(chat.id);
-
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatDetailScreen(
-                  chatId: chat.id,
-                  otherUserName: otherUserName,
-                  itemTitle: chat.itemTitle,
-                  itemImageUrl: chat.itemImageUrl,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'About: ${chat.itemTitle}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            );
-          }
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (isCurrentUserSender)
+                      const Icon(Icons.check, size: 14, color: Colors.grey),
+                    if (isCurrentUserSender)
+                      const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        chat.lastMessage.isEmpty ? 'No messages yet' : chat.lastMessage,
+                        style: TextStyle(
+                          color: hasUnread ? Colors.black : Colors.grey,
+                          fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            onTap: () async {
+              // Mark messages as read when opening chat
+              await _chatService.markMessagesAsRead(chat.id);
+
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatDetailScreen(
+                      chatId: chat.id,
+                      otherUserName: otherUserName,
+                      itemTitle: chat.itemTitle,
+                      itemImageUrl: chat.itemImageUrl,
+                    ),
+                  ),
+                );
+              }
+            },
+          );
         },
       ),
     );

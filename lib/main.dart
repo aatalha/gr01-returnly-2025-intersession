@@ -5,6 +5,7 @@ import 'package:returnly_app/theme/theme.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/theme_mode_notifier.dart';
+import 'services/notification_service.dart';  // Added
 import 'router/app_router.dart';
 
 void main() async {
@@ -12,12 +13,16 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize notification service
+  await NotificationService.initialize();
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
